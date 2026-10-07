@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <!-- 보안 정책: 이 페이지의 스크립트만 실행하고, 통신은 OpenRouter로만 허용한다. 해시는 build_html.py가 채운다. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-l/PYmx97LfxqHCGoAEfoEAgjA4HeoLYRmRrDwdLP1NU=' blob:; worker-src blob:; connect-src https://openrouter.ai blob:; img-src data: blob:; style-src 'unsafe-inline'; font-src data: blob:; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-loW8vKW1G94ZAHkzrtXySIICtfcTuDyyNGFfs2k9sFM=' blob:; worker-src blob:; connect-src https://openrouter.ai blob:; img-src data: blob:; style-src 'unsafe-inline'; font-src data: blob:; base-uri 'none'; form-action 'none'">
 <meta name="referrer" content="no-referrer">
 <title>손필기 요약노트</title>
 <link rel="icon" href="data:,">
@@ -366,16 +366,40 @@ const Renderer = (() => {
     return ["body", s];
   }
 
+  // 줄바꿈 단위: 어절(단어 + 뒤따르는 띄어쓰기). 빈칸 [[...]] 안의 띄어쓰기에서는 끊지 않는다.
+  function wordUnits(toks) {
+    const units = []; let current = [], inSpace = false;
+    for (const tk of toks) {
+      const space = !tk[1] && isSpace(tk[0]);
+      if (!space && inSpace) { units.push(current); current = []; inSpace = false; }
+      if (space) inSpace = true;
+      current.push(tk);
+    }
+    if (current.length) units.push(current);
+    return units;
+  }
+  // 어절 단위로 줄을 나눈다. 한 줄보다 긴 어절만 글자 단위로 끊는다.
+  function wrapTokens(toks, f, firstWidth, restWidth) {
+    const lines = []; let line = [], width = firstWidth;
+    const fits = (arr) => rightEdge(join(arr), f) <= width;
+    const newLine = () => { lines.push(stripEdges(line, false, true)); line = []; width = restWidth; };
+    for (const unit of wordUnits(toks)) {
+      if (line.length && !fits(line.concat(unit))) newLine();
+      // 첫 줄의 들여쓰기는 살리고, 넘어간 줄의 앞 공백은 지운다.
+      const piece = !line.length && lines.length ? stripEdges(unit, true, false) : unit;
+      if (line.length || fits(piece)) { line = line.concat(piece); continue; }
+      for (const tk of piece) {
+        if (line.length && !fits(line.concat([tk]))) { newLine(); if (!tk[1] && isSpace(tk[0])) continue; }
+        line.push(tk);
+      }
+    }
+    if (line.length || !lines.length) lines.push(stripEdges(line, false, true));
+    return lines;
+  }
+
   function splitToWidth(text, f, max) {
     if (!text) return [""];
-    const chunks = []; let line = [];
-    for (const tk of tokens(text)) {
-      const proposed = line.concat([tk]);
-      if (line.length && rightEdge(join(proposed), f) > max) { chunks.push(stripEdges(line, false, true)); line = stripEdges([tk], true, false); }
-      else line = proposed;
-    }
-    if (line.length || !chunks.length) chunks.push(stripEdges(line, false, true));
-    return chunks.map(encode);
+    return wrapTokens(tokens(text), f, max, max).map(encode);
   }
 
   const count = (s, sub) => s.split(sub).length - 1;
@@ -398,16 +422,8 @@ const Renderer = (() => {
     let widest = 0;
     for (const [c] of tokens(detail)) widest = Math.max(widest, rightEdge(c, f));
     if (hang + widest > max) return splitToWidth(prefix + detail, f, max).map((p) => [p, 0]);
-    const result = []; let line = tokens(prefix), indent = 0, width = max;
-    for (const tk of tokens(detail)) {
-      const proposed = line.concat([tk]);
-      if (line.length && rightEdge(join(proposed), f) > width) {
-        result.push([encode(stripEdges(line, false, true)), indent]);
-        line = stripEdges([tk], true, false); indent = hang; width = max - hang;
-      } else line = proposed;
-    }
-    if (line.length || !result.length) result.push([encode(stripEdges(line, false, true)), indent]);
-    return result;
+    // 번호·정의 표지 뒤 설명이 넘어가면 표지가 끝나는 위치에 맞춰 이어 쓴다.
+    return wrapTokens(tokens(prefix).concat(tokens(detail)), f, max, max - hang).map((line, i) => [encode(line), i ? hang : 0]);
   }
 
   function layout(text, fonts, width, narrowBullets) {
