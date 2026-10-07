@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>손필기 요약노트</title>
+<link rel="icon" href="data:,">
 <style>
   :root {
     --bg: #f6f4ee; --card: #fffdf8; --ink: #23201b; --muted: #6f685d; --line: #e3ddd0;
@@ -66,6 +67,11 @@
   details summary { cursor: pointer; font-size: 13px; color: var(--accent); margin-top: 8px; }
   #stdList { font-size: 12.5px; max-height: 220px; overflow: auto; margin-top: 6px; }
   #stdList p { margin: 4px 0; }
+  footer { max-width: 1400px; margin: 0 auto; padding: 4px 16px 32px; font-size: 11.5px; line-height: 1.6; color: var(--muted); }
+  footer .cols { display: grid; gap: 4px 24px; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); border-top: 1px solid var(--line); padding-top: 12px; }
+  footer h3 { font-size: 11.5px; margin: 0 0 2px; color: var(--ink); font-weight: 600; }
+  footer ul { margin: 0; padding-left: 16px; }
+  footer button { font-size: 11px; padding: 2px 8px; margin-top: 4px; }
   #loading { position: fixed; inset: 0; background: var(--bg); display: grid; place-items: center; font-size: 15px; color: var(--muted); z-index: 10; }
 </style>
 </head>
@@ -184,6 +190,38 @@
     <div id="results"></div>
   </section>
 </main>
+<footer>
+  <div class="cols">
+    <div>
+      <h3>개인정보 보호</h3>
+      <ul>
+        <li>이 페이지는 서버가 없는 정적 페이지입니다. 사이트 운영자는 API 키, 교과서 파일, 원고, 결과 PDF를 받거나 저장하지 않습니다.</li>
+        <li>API 키, 작성 중인 원고, 선택한 설정은 이 브라우저의 저장소에만 남습니다.</li>
+        <li>교과서 파일은 이 컴퓨터에서 읽습니다. AI 원고를 만들 때만 선택한 범위의 내용이 브라우저에서 OpenRouter와 선택한 모델 제공사로 직접 전송되며, 그 처리에는 각 회사의 정책이 적용됩니다.</li>
+        <li>호스팅을 맡은 GitHub Pages가 보안을 위해 접속 기록(IP 주소 등)을 남길 수 있습니다.</li>
+      </ul>
+    </div>
+    <div>
+      <h3>보안상 유의사항</h3>
+      <ul>
+        <li>API 키는 본인이 발급한 것만 쓰고 다른 사람과 공유하지 마세요. OpenRouter에서 키별 사용 한도를 정해 두면 안전합니다.</li>
+        <li>공용 PC에서는 사용 후 아래 버튼으로 저장된 키와 원고를 지우세요.</li>
+        <li>이 공식 주소에서만 사용하세요. 복사본이나 수정본은 키를 빼돌리도록 바뀌었을 수 있습니다.</li>
+        <li>학생 이름 등 개인정보가 담긴 자료는 올리지 마세요. 교과서 등 저작물은 수업 목적 범위에서 사용하세요.</li>
+      </ul>
+      <button id="clearData">이 브라우저에 저장된 키 · 원고 지우기</button>
+    </div>
+    <div>
+      <h3>출처</h3>
+      <ul>
+        <li>노트 작성 규칙 · 렌더러 · 2022 개정 교육과정 자료: <a href="https://github.com/xodn0109-glitch/goodnotes-handwriting-note" target="_blank" rel="noopener">xodn0109-glitch/goodnotes-handwriting-note</a></li>
+        <li>글꼴: 학교안심 받아쓰기 © KERIS, SIL Open Font License (웹용 WOFF2로 압축)</li>
+        <li>PDF 읽기: <a href="https://mozilla.github.io/pdf.js/" target="_blank" rel="noopener">pdf.js</a> (Mozilla, Apache-2.0) · AI 연결: <a href="https://openrouter.ai" target="_blank" rel="noopener">OpenRouter</a></li>
+        <li>웹 버전 소스: <a href="https://github.com/Taehwan-Shin/handwriting-note-web" target="_blank" rel="noopener">Taehwan-Shin/handwriting-note-web</a></li>
+      </ul>
+    </div>
+  </div>
+</footer>
 
 <script>
 "use strict";
@@ -1094,6 +1132,14 @@ $("#export").onclick = async () => {
     box.querySelector(".row").appendChild(zipBtn);
   } catch (e) { status.textContent = ""; show($("#exportMsg"), "PDF 생성 실패: " + e.message); }
   btn.disabled = false;
+};
+
+/* 저장된 정보 지우기 */
+$("#clearData").onclick = () => {
+  if (!confirm("이 브라우저에 저장된 API 키, 원고, 설정을 모두 지울까요?")) return;
+  try { Object.keys(localStorage).filter((k) => k.startsWith("hn:")).forEach((k) => localStorage.removeItem(k)); } catch {}
+  $("#apiKey").value = ""; $("#keyMsg").innerHTML = "";
+  alert("지웠습니다. 편집기에 보이는 원고는 페이지를 닫으면 사라집니다.");
 };
 
 /* 시작: 글꼴 불러오기 */
